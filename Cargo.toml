@@ -1,0 +1,9 @@
+[package]
+name = "win_app"
+version = "0.1.0"
+authors = ["madosuki <yurikasamaaikatsu@gmail.com>"]
+edition = "2018"
+
+
+[dependencies]
+bindings = { package = "msg_bindings", path = "./bindings" }
