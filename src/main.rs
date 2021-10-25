@@ -57,11 +57,14 @@ fn main() {
     wnd.lpszClassName = class_name;
     
     unsafe {
-        RegisterClassW(&wnd);
-        println!("{:?}", GetLastError());
+        let result = RegisterClassW(&wnd);
+        if result == 0 {
+            println!("{:?}", GetLastError());
+            return
+        }
     }
 
-    let mut hwnd: HWND = unsafe {
+    let hwnd: HWND = unsafe {
         CreateWindowExW(
             WS_EX_OVERLAPPEDWINDOW,
             class_name,
@@ -84,12 +87,6 @@ fn main() {
             println!("{:?}", GetLastError());
             return
         }
-        /*
-        let update_window_result = UpdateWindow(hwnd);
-        if !update_window_result.as_bool() {
-            return
-        }
-        */
 
         let mut msg = MSG::default();
         loop {
