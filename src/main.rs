@@ -9,10 +9,10 @@ use bindings::Windows::Win32::UI::WindowsAndMessaging::{
     MessageBoxA, 
     MB_OK,
     WNDCLASS_STYLES,
-    WNDCLASSEXW,
+    WNDCLASSW,
     HICON,
     HCURSOR,
-    RegisterClassExW,
+    RegisterClassW,
     PostQuitMessage,
     DefWindowProcW,
     WM_DESTROY,
@@ -21,10 +21,12 @@ use bindings::Windows::Win32::UI::WindowsAndMessaging::{
     TranslateMessage,
     DispatchMessageW,
     GetMessageW,
-    SHOW_WINDOW_CMD
+    SHOW_WINDOW_CMD,
+    WS_EX_OVERLAPPEDWINDOW
 };
 use bindings::Windows::Win32::Foundation::{HWND, HINSTANCE, PWSTR, LPARAM, WPARAM, LRESULT};
 use bindings::Windows::Win32::Graphics::Gdi::{UpdateWindow, HBRUSH, HDC};
+use bindings::Windows::Win32::System::Diagnostics::Debug::GetLastError;
 
 fn convert_u8_to_u16(src: &str) -> Vec<u16> {
     src.encode_utf16().chain(Some(0)).collect()
@@ -49,28 +51,19 @@ fn main() {
     let menu_name = convert_to_pwstr("menu name");
     let window_name = convert_to_pwstr("Win32 app written in Rust");
     
-    let wnd = WNDCLASSEXW {
-             cbSize: 0,
-             style: WNDCLASS_STYLES(0),
-             lpfnWndProc: Some(wnd_proc),
-             cbClsExtra: 0,
-             cbWndExtra: 0,
-             hInstance: HINSTANCE::default(),
-             hIcon: HICON(0),
-             hCursor: HCURSOR(0),
-             hbrBackground: HBRUSH(0),
-             lpszMenuName: menu_name,
-             lpszClassName: class_name,
-             hIconSm: HICON(0)
-    };
+    let mut wnd = WNDCLASSW::default();
+    wnd.lpfnWndProc = Some(wnd_proc);
+    wnd.hInstance = HINSTANCE::default();
+    wnd.lpszClassName = class_name;
     
     unsafe {
-        RegisterClassExW(&wnd);
+        RegisterClassW(&wnd);
+        println!("{:?}", GetLastError());
     }
 
-    let hwnd: HWND = unsafe {
+    let mut hwnd: HWND = unsafe {
         CreateWindowExW(
-            WINDOW_EX_STYLE(0), 
+            WS_EX_OVERLAPPEDWINDOW,
             class_name,
             window_name,
             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
@@ -84,8 +77,13 @@ fn main() {
             std::ptr::null_mut()
         )
     };
+
     unsafe {
-        ShowWindow(hwnd, SHOW_WINDOW_CMD(5));
+        let show_window_result = ShowWindow(hwnd, SW_SHOW);
+        if !show_window_result.as_bool() {
+            println!("{:?}", GetLastError());
+            return
+        }
         /*
         let update_window_result = UpdateWindow(hwnd);
         if !update_window_result.as_bool() {

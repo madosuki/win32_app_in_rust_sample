@@ -6,10 +6,10 @@ fn main() {
             ShowWindow, 
             WINDOW_EX_STYLE, 
             MessageBoxA, 
-            WNDCLASSEXW,
+            WNDCLASSW,
             HICON,
             HCURSOR,
-            RegisterClassExW,
+            RegisterClassW,
             PostQuitMessage,
             DefWindowProcW,
             WM_DESTROY,
@@ -21,6 +21,7 @@ fn main() {
             SHOW_WINDOW_CMD
          },
         Windows::Win32::Graphics::Gdi::{ UpdateWindow, HBRUSH, HDC },
-        Windows::Win32::Foundation::{ HWND, HINSTANCE, PWSTR, LPARAM, WPARAM, LRESULT }
+        Windows::Win32::Foundation::{ HWND, HINSTANCE, PWSTR, LPARAM, WPARAM, LRESULT },
+        Windows::Win32::System::Diagnostics::Debug::GetLastError
     );
 }
