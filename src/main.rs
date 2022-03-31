@@ -48,7 +48,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
 
 fn main() {
     let class_name = convert_to_pwstr("test_window");
-    let menu_name = convert_to_pwstr("menu name");
+    let _menu_name = convert_to_pwstr("menu name");
     let window_name = convert_to_pwstr("Win32 app written in Rust");
     
     let mut wnd = WNDCLASSW::default();
