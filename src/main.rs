@@ -40,7 +40,7 @@ fn convert_to_pwstr(src: &str) -> PWSTR {
 }
 
 fn convert_to_pcwstr(src: &str) -> PCWSTR {
-    PCWSTR(convert_u8_to_u16(src).as_mut_ptr())
+    PCWSTR(convert_u8_to_u16(src).as_ptr())
 }
 
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -60,7 +60,7 @@ fn main() {
             Err(_) => panic!("failed instance")
         }
     };
-    let sz_window_class = PCWSTR("class name".as_ptr() as _);
+    let sz_window_class = convert_to_pcwstr("class_name");
 
     let mut wnd = WNDCLASSW::default();
     wnd.lpfnWndProc = Some(wnd_proc);
