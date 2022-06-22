@@ -1,7 +1,8 @@
 use windows::{
-    core::{PWSTR, PCWSTR},
+    core::{PWSTR, PCWSTR, PCSTR, PSTR},
     Win32::Foundation::{HWND, HINSTANCE, LPARAM, WPARAM, LRESULT, GetLastError},
     Win32::Graphics::Gdi::{UpdateWindow, HBRUSH, HDC},
+    Win32::System::LibraryLoader::GetModuleHandleW,
     Win32::UI::WindowsAndMessaging::{
         HMENU, 
         CreateWindowExW, 
@@ -53,14 +54,18 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
 }
 
 fn main() {
-    let class_name = convert_to_pcwstr("test_window");
-    let _menu_name = convert_to_pwstr("menu name");
-    let window_name = convert_to_pcwstr("Win32 app written in Rust");
-    
+    let instance = unsafe {
+        match GetModuleHandleW(None) {
+            Ok(v) => v,
+            Err(_) => panic!("failed instance")
+        }
+    };
+    let sz_window_class = PCWSTR("class name".as_ptr() as _);
+
     let mut wnd = WNDCLASSW::default();
     wnd.lpfnWndProc = Some(wnd_proc);
-    wnd.hInstance = HINSTANCE::default();
-    wnd.lpszClassName = class_name;
+    wnd.hInstance = instance;
+    wnd.lpszClassName = sz_window_class;
     
     unsafe {
         let result = RegisterClassW(&wnd);
@@ -71,9 +76,10 @@ fn main() {
     }
 
     let hwnd: HWND = unsafe {
+        let window_name = convert_to_pcwstr("Win32 app written in Rust");
         CreateWindowExW(
             WS_EX_OVERLAPPEDWINDOW,
-            class_name,
+            sz_window_class,
             window_name,
             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
             0,
@@ -82,7 +88,7 @@ fn main() {
             768,
             HWND::default(),
             HMENU::default(),
-            HINSTANCE::default(),
+            instance,
             std::ptr::null_mut()
         )
     };
