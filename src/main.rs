@@ -1,32 +1,34 @@
-use bindings::Windows::Win32::UI::WindowsAndMessaging::{
-    HMENU, 
-    CreateWindowExW, 
-    ShowWindow, 
-    WINDOW_EX_STYLE, 
-    WS_VISIBLE, 
-    WS_OVERLAPPEDWINDOW, 
-    SW_SHOW, 
-    MessageBoxA, 
-    MB_OK,
-    WNDCLASS_STYLES,
-    WNDCLASSW,
-    HICON,
-    HCURSOR,
-    RegisterClassW,
-    PostQuitMessage,
-    DefWindowProcW,
-    WM_DESTROY,
-    WM_PAINT,
-    MSG,
-    TranslateMessage,
-    DispatchMessageW,
-    GetMessageW,
-    SHOW_WINDOW_CMD,
-    WS_EX_OVERLAPPEDWINDOW
+use windows::{
+    core::{PWSTR, PCWSTR},
+    Win32::Foundation::{HWND, HINSTANCE, LPARAM, WPARAM, LRESULT, GetLastError},
+    Win32::Graphics::Gdi::{UpdateWindow, HBRUSH, HDC},
+    Win32::UI::WindowsAndMessaging::{
+        HMENU, 
+        CreateWindowExW, 
+        ShowWindow, 
+        WINDOW_EX_STYLE, 
+        WS_VISIBLE, 
+        WS_OVERLAPPEDWINDOW, 
+        SW_SHOW, 
+        MessageBoxA, 
+        MB_OK,
+        WNDCLASS_STYLES,
+        WNDCLASSW,
+        HICON,
+        HCURSOR,
+        RegisterClassW,
+        PostQuitMessage,
+        DefWindowProcW,
+        WM_DESTROY,
+        WM_PAINT,
+        MSG,
+        TranslateMessage,
+        DispatchMessageW,
+        GetMessageW,
+        SHOW_WINDOW_CMD,
+        WS_EX_OVERLAPPEDWINDOW
+    }
 };
-use bindings::Windows::Win32::Foundation::{HWND, HINSTANCE, PWSTR, LPARAM, WPARAM, LRESULT};
-use bindings::Windows::Win32::Graphics::Gdi::{UpdateWindow, HBRUSH, HDC};
-use bindings::Windows::Win32::System::Diagnostics::Debug::GetLastError;
 
 fn convert_u8_to_u16(src: &str) -> Vec<u16> {
     src.encode_utf16().chain(Some(0)).collect()
@@ -34,6 +36,10 @@ fn convert_u8_to_u16(src: &str) -> Vec<u16> {
 
 fn convert_to_pwstr(src: &str) -> PWSTR {
     PWSTR(convert_u8_to_u16(src).as_mut_ptr())
+}
+
+fn convert_to_pcwstr(src: &str) -> PCWSTR {
+    PCWSTR(convert_u8_to_u16(src).as_mut_ptr())
 }
 
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -47,9 +53,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
 }
 
 fn main() {
-    let class_name = convert_to_pwstr("test_window");
+    let class_name = convert_to_pcwstr("test_window");
     let _menu_name = convert_to_pwstr("menu name");
-    let window_name = convert_to_pwstr("Win32 app written in Rust");
+    let window_name = convert_to_pcwstr("Win32 app written in Rust");
     
     let mut wnd = WNDCLASSW::default();
     wnd.lpfnWndProc = Some(wnd_proc);
