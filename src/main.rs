@@ -1,38 +1,23 @@
+use std::os::windows::prelude::OsStrExt;
+
 use windows::{
-    core::{PWSTR, PCWSTR, PCSTR, PSTR},
-    Win32::Foundation::{HWND, HINSTANCE, LPARAM, WPARAM, LRESULT, GetLastError},
+    core::{PCSTR, PCWSTR, PSTR, PWSTR},
+    Win32::Foundation::{GetLastError, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
     Win32::Graphics::Gdi::{UpdateWindow, HBRUSH, HDC},
     Win32::System::LibraryLoader::GetModuleHandleW,
     Win32::UI::WindowsAndMessaging::{
-        HMENU, 
-        CreateWindowExW, 
-        ShowWindow, 
-        WINDOW_EX_STYLE, 
-        WS_VISIBLE, 
-        WS_OVERLAPPEDWINDOW, 
-        SW_SHOW, 
-        MessageBoxA, 
-        MB_OK,
-        WNDCLASS_STYLES,
-        WNDCLASSW,
-        HICON,
-        HCURSOR,
-        RegisterClassW,
-        PostQuitMessage,
-        DefWindowProcW,
-        WM_DESTROY,
-        WM_PAINT,
-        MSG,
-        TranslateMessage,
-        DispatchMessageW,
-        GetMessageW,
-        SHOW_WINDOW_CMD,
-        WS_EX_OVERLAPPEDWINDOW
-    }
+        CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, LoadStringW, MessageBoxA,
+        PostQuitMessage, RegisterClassW, ShowWindow, TranslateMessage, HCURSOR, HICON, HMENU,
+        MB_OK, MSG, SHOW_WINDOW_CMD, SW_SHOW, WINDOW_EX_STYLE, WM_DESTROY, WM_PAINT, WNDCLASSW,
+        WNDCLASS_STYLES, WS_EX_OVERLAPPEDWINDOW, WS_OVERLAPPEDWINDOW, WS_VISIBLE,
+    },
 };
 
 fn convert_u8_to_u16(src: &str) -> Vec<u16> {
-    src.encode_utf16().chain(Some(0)).collect()
+    // ref from https://teratail.com/questions/lcimq2rocy2hyu
+    let mut a: Vec<u16> = std::ffi::OsString::from(src).encode_wide().collect();
+    a.push(0);
+    a
 }
 
 fn convert_to_pwstr(src: &str) -> PWSTR {
@@ -40,44 +25,46 @@ fn convert_to_pwstr(src: &str) -> PWSTR {
 }
 
 fn convert_to_pcwstr(src: &str) -> PCWSTR {
-    PCWSTR(convert_u8_to_u16(src).as_ptr())
+    PCWSTR(convert_u8_to_u16(src).as_mut_ptr())
 }
 
-unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    
+unsafe extern "system" fn wnd_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     match msg {
         WM_DESTROY => PostQuitMessage(0),
-        _ => return DefWindowProcW(hwnd, msg, wparam, lparam)
+        _ => return DefWindowProcW(hwnd, msg, wparam, lparam),
     }
-    
+
     LRESULT(0)
 }
 
 fn main() {
-    let instance = unsafe {
-        match GetModuleHandleW(None) {
-            Ok(v) => v,
-            Err(_) => panic!("failed instance")
-        }
-    };
-    let sz_window_class = convert_to_pcwstr("class_name");
-
-    let mut wnd = WNDCLASSW::default();
-    wnd.lpfnWndProc = Some(wnd_proc);
-    wnd.hInstance = instance;
-    wnd.lpszClassName = sz_window_class;
-    
     unsafe {
+        let instance = match GetModuleHandleW(None) {
+            Ok(v) => v,
+            Err(_) => panic!("failed instance"),
+        };
+
+        let sz_window_class = convert_to_pcwstr("class_name");
+
+        let mut wnd = WNDCLASSW::default();
+        wnd.lpfnWndProc = Some(wnd_proc);
+        wnd.hInstance = instance;
+        wnd.lpszClassName = sz_window_class;
+
         let result = RegisterClassW(&wnd);
         if result == 0 {
             println!("{:?}", GetLastError());
-            return
+            return;
         }
-    }
 
-    let hwnd: HWND = unsafe {
-        let window_name = convert_to_pcwstr("Win32 app written in Rust");
-        CreateWindowExW(
+        let s = "window name";
+        let window_name = convert_to_pcwstr(s);
+        let hwnd: HWND = CreateWindowExW(
             WS_EX_OVERLAPPEDWINDOW,
             sz_window_class,
             window_name,
@@ -89,27 +76,24 @@ fn main() {
             HWND::default(),
             HMENU::default(),
             instance,
-            std::ptr::null_mut()
-        )
-    };
+            std::ptr::null_mut(),
+        );
 
-    unsafe {
         let show_window_result = ShowWindow(hwnd, SW_SHOW);
         if !show_window_result.as_bool() {
             println!("{:?}", GetLastError());
-            return
+            return;
         }
 
         let mut msg = MSG::default();
         loop {
             let get_messeage_result = GetMessageW(&mut msg, HWND(0), 0, 0);
             if !get_messeage_result.as_bool() {
-                return
+                return;
             }
 
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
     }
-    
 }
