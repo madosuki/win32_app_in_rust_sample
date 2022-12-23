@@ -64,6 +64,7 @@ fn main() {
 
         let s = "window name";
         let window_name = convert_to_pcwstr(s);
+        let llparam = Some(std::ptr::null());
         let hwnd: HWND = CreateWindowExW(
             WS_EX_OVERLAPPEDWINDOW,
             sz_window_class,
@@ -76,7 +77,7 @@ fn main() {
             HWND::default(),
             HMENU::default(),
             instance,
-            std::ptr::null_mut(),
+            llparam,
         );
 
         let show_window_result = ShowWindow(hwnd, SW_SHOW);
