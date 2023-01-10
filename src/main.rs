@@ -20,13 +20,17 @@ fn convert_u8_to_u16(src: &str) -> Vec<u16> {
     a
 }
 
+/*
 fn convert_to_pwstr(src: &str) -> PWSTR {
     PWSTR(convert_u8_to_u16(src).as_mut_ptr())
 }
+*/
 
+/*
 fn convert_to_pcwstr(src: &str) -> PCWSTR {
     PCWSTR(convert_u8_to_u16(src).as_mut_ptr())
 }
+*/
 
 unsafe extern "system" fn wnd_proc(
     hwnd: HWND,
@@ -42,59 +46,76 @@ unsafe extern "system" fn wnd_proc(
     LRESULT(0)
 }
 
-fn main() {
-    unsafe {
-        let instance = match GetModuleHandleW(None) {
-            Ok(v) => v,
-            Err(_) => panic!("failed instance"),
-        };
+#[derive(Default)]
+struct MainWindow {
+    window_name_vec: Vec<u16>,
+    class_name_vec: Vec<u16>,
+}
 
-        let sz_window_class = convert_to_pcwstr("class_name");
-
-        let mut wnd = WNDCLASSW::default();
-        wnd.lpfnWndProc = Some(wnd_proc);
-        wnd.hInstance = instance;
-        wnd.lpszClassName = sz_window_class;
-
-        let result = RegisterClassW(&wnd);
-        if result == 0 {
-            println!("{:?}", GetLastError());
-            return;
-        }
-
-        let s = "window name";
-        let window_name = convert_to_pcwstr(s);
-        let llparam = Some(std::ptr::null());
-        let hwnd: HWND = CreateWindowExW(
-            WS_EX_OVERLAPPEDWINDOW,
-            sz_window_class,
-            window_name,
-            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-            0,
-            0,
-            1024,
-            768,
-            HWND::default(),
-            HMENU::default(),
-            instance,
-            llparam,
-        );
-
-        let show_window_result = ShowWindow(hwnd, SW_SHOW);
-        if !show_window_result.as_bool() {
-            println!("{:?}", GetLastError());
-            return;
-        }
-
-        let mut msg = MSG::default();
-        loop {
-            let get_messeage_result = GetMessageW(&mut msg, HWND(0), 0, 0);
-            if !get_messeage_result.as_bool() {
+impl MainWindow {
+    pub fn init(mut self) {
+        unsafe {
+            let instance = match GetModuleHandleW(None) {
+                Ok(v) => v,
+                Err(_) => panic!("failed instance"),
+            };
+    
+            let class_name_str = "class_name";
+            self.class_name_vec = convert_u8_to_u16(class_name_str);
+            let sz_window_class = PCWSTR(self.class_name_vec.as_mut_ptr());
+    
+            let mut wnd = WNDCLASSW::default();
+            wnd.lpfnWndProc = Some(wnd_proc);
+            wnd.hInstance = instance;
+            wnd.lpszClassName = sz_window_class;
+    
+            let result = RegisterClassW(&wnd);
+            if result == 0 {
+                println!("{:?}", GetLastError());
                 return;
             }
-
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
+    
+            let s = "window name";
+            self.window_name_vec = convert_u8_to_u16(s);
+            let window_name = PCWSTR(self.window_name_vec.as_mut_ptr());
+            let llparam = Some(std::ptr::null());
+            let hwnd: HWND = CreateWindowExW(
+                WS_EX_OVERLAPPEDWINDOW,
+                sz_window_class,
+                window_name,
+                WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                0,
+                0,
+                1024,
+                768,
+                HWND::default(),
+                HMENU::default(),
+                instance,
+                llparam,
+            );
+    
+            let show_window_result = ShowWindow(hwnd, SW_SHOW);
+            if !show_window_result.as_bool() {
+                println!("{:?}", GetLastError());
+                return;
+            }
+    
+            let mut msg = MSG::default();
+            loop {
+                let get_messeage_result = GetMessageW(&mut msg, HWND(0), 0, 0);
+                if !get_messeage_result.as_bool() {
+                    return;
+                }
+    
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        } 
     }
 }
+
+fn main() {
+    let main_window = MainWindow::default();
+    main_window.init();
+}
+
