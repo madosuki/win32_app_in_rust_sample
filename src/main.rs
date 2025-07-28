@@ -1,114 +1,161 @@
-use std::os::windows::prelude::OsStrExt;
+use std::os::windows::{ffi::OsStrExt};
 
-use windows::{
-    core::{PCSTR, PCWSTR, PSTR, PWSTR},
-    Win32::Foundation::{GetLastError, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
-    Win32::Graphics::Gdi::{UpdateWindow, HBRUSH, HDC},
-    Win32::System::LibraryLoader::GetModuleHandleW,
-    Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, LoadStringW, MessageBoxA,
-        PostQuitMessage, RegisterClassW, ShowWindow, TranslateMessage, HCURSOR, HICON, HMENU,
-        MB_OK, MSG, SHOW_WINDOW_CMD, SW_SHOW, WINDOW_EX_STYLE, WM_DESTROY, WM_PAINT, WNDCLASSW,
-        WNDCLASS_STYLES, WS_EX_OVERLAPPEDWINDOW, WS_OVERLAPPEDWINDOW, WS_VISIBLE,
-    },
-};
+use windows::Win32::{
+    Foundation::{GetLastError, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
+    Graphics::{self, Gdi::{BeginPaint, BitBlt, CreateCompatibleDC, SelectObject, DT_WORDBREAK, HBITMAP, HGDIOBJ, SRCCOPY}, GdiPlus::{GdipCreateFromHDC, GdiplusShutdown, GdiplusStartup, GdiplusStartupInput, GpGraphics, GpImage, Image}}, 
+    System::LibraryLoader::{GetModuleHandleA, GetModuleHandleExW}, 
+    UI::WindowsAndMessaging::{
+        DispatchMessageW, GetClientRect, GetMessageW, PostQuitMessage, RegisterClassW, ShowWindow, CW_USEDEFAULT, GDI_IMAGE_TYPE, IMAGE_BITMAP, LR_CREATEDIBSECTION, LR_LOADFROMFILE, SW_SHOW, WINDOW_EX_STYLE, WM_CREATE, WM_DESTROY, WM_PAINT, WNDCLASSA, WNDCLASSW, WS_EX_OVERLAPPEDWINDOW, WS_OVERLAPPED, WS_OVERLAPPEDWINDOW, WS_VISIBLE
+    }};
+use windows::core::w;
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::WindowsAndMessaging::DefWindowProcW;
 
 fn convert_u8_to_u16(src: &str) -> Vec<u16> {
     // ref from https://teratail.com/questions/lcimq2rocy2hyu
-    let mut a: Vec<u16> = std::ffi::OsString::from(src).encode_wide().collect();
-    a.push(0);
+    let a: Vec<u16> = std::ffi::OsString::from(src).encode_wide().collect();
     a
 }
 
-/*
-fn convert_to_pwstr(src: &str) -> PWSTR {
-    PWSTR(convert_u8_to_u16(src).as_mut_ptr())
-}
-*/
+extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let img_path = w!("C:\\Users\\user\\Pictures\\example.bmp");
+                let mut img = windows::Win32::Graphics::GdiPlus::GpImage::default();
+                let mut img_ptr: *mut GpImage = &mut img;
+                let img_ptr_ptr: *mut *mut GpImage = &mut img_ptr;
+                let s = windows::Win32::Graphics::GdiPlus::GdipLoadImageFromFile(img_path, img_ptr_ptr);
+                println!("GdipLoadImageFromFile: {}", s.0);
+                /*
+                let cx = 1000;
+                let cy = 1414;
+                let img_handle =
+                 windows::Win32::UI::WindowsAndMessaging::LoadImageW(None,
+                     img_path,
+                      IMAGE_BITMAP, 
+                      cx, cy, 
+                      LR_LOADFROMFILE | LR_CREATEDIBSECTION);
+                match img_handle {
+                    Ok(_) => println!("load success"),
+                    Err(v) => println!("Error: {}", v),
+                }
+                */
+                println!("nyaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaan");
+            },
+            WM_PAINT => {
+                let mut rect = windows::Win32::Foundation::RECT::default();
+                rect.top = 0;
+                rect.bottom = 100;
+                rect.left = 50;
+                rect.right = 200;
+                // let _ = GetClientRect(hwnd, &mut rect);
 
-/*
-fn convert_to_pcwstr(src: &str) -> PCWSTR {
-    PCWSTR(convert_u8_to_u16(src).as_mut_ptr())
-}
-*/
+                let mut paint = windows::Win32::Graphics::Gdi::PAINTSTRUCT::default();
+                let hdc = BeginPaint(hwnd, &mut paint);
+                let mut text = convert_u8_to_u16("猫 wake up!\r\nHero!");
+                windows::Win32::Graphics::Gdi::DrawTextW(
+                    hdc, 
+                    &mut text,
+                    &mut rect,
+                    DT_WORDBREAK);
+                let mut graphics = windows::Win32::Graphics::GdiPlus::GpGraphics::default();
+                let mut graphics_ptr: *mut GpGraphics = &mut graphics;
+                let graphics_ptr_ptr: *mut *mut GpGraphics = &mut graphics_ptr;
+                let graphics_status = GdipCreateFromHDC(hdc, graphics_ptr_ptr);
+                println!("gprahics_status: {}", graphics_status.0);
+                // windows::Win32::Graphics::GdiPlus::GdipDrawImage(graphics, image, x, y)
 
-unsafe extern "system" fn wnd_proc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_DESTROY => PostQuitMessage(0),
-        _ => return DefWindowProcW(hwnd, msg, wparam, lparam),
+            },
+            WM_DESTROY => {
+                PostQuitMessage(0);
+            },
+            _ => return DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
     }
-
     LRESULT(0)
 }
 
 #[derive(Default)]
 struct MainWindow {
-    window_name: PCWSTR,
-    class_name: PCWSTR,
+    window_title: windows::core::PCWSTR,
+    class_name: windows::core::PCWSTR,
 }
 
-impl MainWindow {
-    pub fn init(mut self) {
+impl MainWindow  {
+    pub fn start(mut self) -> windows::core::Result<()> {
+
+        self.class_name = w!("Example App");
+
+        let window_title = windows::core::w!("Example App Window");
+        self.window_title = window_title;
+
+        let module = unsafe { 
+            GetModuleHandleW(None).expect("failed get module handle")
+        };
+        let h_instance: HINSTANCE = module.into();
+
+        let wnd = WNDCLASSW { 
+            hInstance: h_instance,
+            lpszClassName: self.class_name,
+            lpfnWndProc: Some(wnd_proc),
+            ..Default::default()
+        };
+
         unsafe {
-            let instance: HINSTANCE = GetModuleHandleW(None).expect("").into();
-    
-            // let class_name_str = "class_name";
-            self.class_name = windows::core::w!("class_name");
-    
-            let mut wnd = WNDCLASSW::default();
-            wnd.lpfnWndProc = Some(wnd_proc);
-            wnd.hInstance = instance;
-            wnd.lpszClassName = self.class_name;
-    
-            let result = RegisterClassW(&wnd);
-            if result == 0 {
+            let r = windows::Win32::UI::WindowsAndMessaging::RegisterClassW(&wnd);
+            if r == 0 {
                 println!("{:?}", GetLastError());
-                return;
+                panic!("");
             }
-    
-            self.window_name = windows::core::w!("window name");
-            let hwnd: HWND = CreateWindowExW(
-                WS_EX_OVERLAPPEDWINDOW,
-                self.class_name,
-                self.window_name,
-                WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-                0,
-                0,
-                1024,
-                768,
-                None,
-                None,
-                None,
-                None
-            ).expect("failed create window");
-    
-            let show_window_result = ShowWindow(hwnd, SW_SHOW);
-            if !show_window_result.as_bool() {
-                println!("{:?}", GetLastError());
-                return;
-            }
-    
-            let mut msg = MSG::default();
+        }
+
+        let mut gdip_token = 0usize;
+        let mut gdip_input = GdiplusStartupInput {
+            GdiplusVersion: 1,
+            ..Default::default()
+        };
+        let gdi_status = unsafe {
+            GdiplusStartup(&mut gdip_token, &mut gdip_input, std::ptr::null_mut())
+        };
+        println!("GdiplusStartup Status: {}", gdi_status.0);
+
+        let hwnd = unsafe {
+            windows::Win32::UI::WindowsAndMessaging::CreateWindowExW(
+            WS_EX_OVERLAPPEDWINDOW,
+            self.class_name,            
+            self.window_title,
+            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+            CW_USEDEFAULT, CW_USEDEFAULT,
+            CW_USEDEFAULT, CW_USEDEFAULT,
+            None,
+            None,
+            None,
+            None).expect("failed createwindow.")
+        };
+
+        unsafe {
+            let _ = ShowWindow(hwnd, SW_SHOW);
+            let mut msg = windows::Win32::UI::WindowsAndMessaging::MSG::default();
             loop {
-                let get_messeage_result = GetMessageW(&mut msg, Some(HWND::default()), 0, 0);
-                if !get_messeage_result.as_bool() {
-                    return;
+                let get_message_result = GetMessageW(&mut msg, None, 0, 0);
+                if !get_message_result.as_bool() {
+                    break;
                 }
-    
-                TranslateMessage(&msg);
+
                 DispatchMessageW(&msg);
             }
-        } 
+            GdiplusShutdown(gdip_token);
+            return Ok(())
+        }
     }
+
 }
 
+
 fn main() {
-    let main_window = MainWindow::default();
-    main_window.init();
+  let w = MainWindow::default();
+  let _ = w.start();
 }
+
 
