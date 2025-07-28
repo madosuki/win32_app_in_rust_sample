@@ -1,4 +1,6 @@
-use std::os::windows::{ffi::OsStrExt};
+use std::sync::{LazyLock, Mutex};
+
+use std::{os::windows::ffi::OsStrExt};
 
 use windows::Win32::{
     Foundation::{GetLastError, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
@@ -17,31 +19,23 @@ fn convert_u8_to_u16(src: &str) -> Vec<u16> {
     a
 }
 
+// static CACHE_IMG: LazyLock<Mutex<Vec<GpImage>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+
 extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     unsafe {
         match msg {
             WM_CREATE => {
+                /*
                 let img_path = w!("C:\\Users\\user\\Pictures\\example.bmp");
                 let mut img = windows::Win32::Graphics::GdiPlus::GpImage::default();
                 let mut img_ptr: *mut GpImage = &mut img;
                 let img_ptr_ptr: *mut *mut GpImage = &mut img_ptr;
                 let s = windows::Win32::Graphics::GdiPlus::GdipLoadImageFromFile(img_path, img_ptr_ptr);
                 println!("GdipLoadImageFromFile: {}", s.0);
-                /*
-                let cx = 1000;
-                let cy = 1414;
-                let img_handle =
-                 windows::Win32::UI::WindowsAndMessaging::LoadImageW(None,
-                     img_path,
-                      IMAGE_BITMAP, 
-                      cx, cy, 
-                      LR_LOADFROMFILE | LR_CREATEDIBSECTION);
-                match img_handle {
-                    Ok(_) => println!("load success"),
-                    Err(v) => println!("Error: {}", v),
+                if s.0 == 0 {
+                    CACHE_IMG.lock().unwrap().push(img.to_owned());
                 }
                 */
-                println!("nyaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaan");
             },
             WM_PAINT => {
                 let mut rect = windows::Win32::Foundation::RECT::default();
@@ -64,7 +58,22 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 let graphics_ptr_ptr: *mut *mut GpGraphics = &mut graphics_ptr;
                 let graphics_status = GdipCreateFromHDC(hdc, graphics_ptr_ptr);
                 println!("gprahics_status: {}", graphics_status.0);
-                // windows::Win32::Graphics::GdiPlus::GdipDrawImage(graphics, image, x, y)
+
+                /*
+                let mut cache_img = CACHE_IMG.lock().unwrap();
+                if cache_img.len() > 0 {
+                    windows::Win32::Graphics::GdiPlus::GdipDrawImage(graphics_ptr, &mut cache_img[0], 0.0, 50.0);
+                }
+                */
+
+                let img_path = w!("C:\\Users\\user\\Pictures\\example.bmp");
+                let mut img = windows::Win32::Graphics::GdiPlus::GpImage::default();
+                let mut img_ptr: *mut GpImage = &mut img;
+                let img_ptr_ptr: *mut *mut GpImage = &mut img_ptr;
+                let s = windows::Win32::Graphics::GdiPlus::GdipLoadImageFromFile(img_path, img_ptr_ptr);
+                if s.0 == 0 {
+                    windows::Win32::Graphics::GdiPlus::GdipDrawImage(graphics_ptr, img_ptr, 0.0, 50.0);
+                }
 
             },
             WM_DESTROY => {
