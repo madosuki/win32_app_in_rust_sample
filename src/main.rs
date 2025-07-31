@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::{LazyLock, Mutex};
 
 use std::{os::windows::ffi::OsStrExt};
@@ -11,7 +12,7 @@ use windows::Win32::{
     }};
 use windows::core::w;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::WindowsAndMessaging::DefWindowProcW;
+use windows::Win32::UI::WindowsAndMessaging::{DefWindowProcW, GetWindowLongPtrW, SetWindowLongPtrW, GWLP_USERDATA};
 
 fn convert_u8_to_u16(src: &str) -> Vec<u16> {
     // ref from https://teratail.com/questions/lcimq2rocy2hyu
@@ -19,23 +20,23 @@ fn convert_u8_to_u16(src: &str) -> Vec<u16> {
     a
 }
 
-// static CACHE_IMG: LazyLock<Mutex<Vec<GpImage>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+struct ImageContainer {
+    img_ptr: *mut GpImage,
+}
 
 extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     unsafe {
         match msg {
             WM_CREATE => {
-                /*
                 let img_path = w!("C:\\Users\\user\\Pictures\\example.bmp");
                 let mut img = windows::Win32::Graphics::GdiPlus::GpImage::default();
                 let mut img_ptr: *mut GpImage = &mut img;
-                let img_ptr_ptr: *mut *mut GpImage = &mut img_ptr;
-                let s = windows::Win32::Graphics::GdiPlus::GdipLoadImageFromFile(img_path, img_ptr_ptr);
+                let s = windows::Win32::Graphics::GdiPlus::GdipLoadImageFromFile(img_path, &mut img_ptr);
                 println!("GdipLoadImageFromFile: {}", s.0);
                 if s.0 == 0 {
-                    CACHE_IMG.lock().unwrap().push(img.to_owned());
+                    let img_container = Box::new(ImageContainer { img_ptr: img_ptr });
+                    SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(img_container) as isize);
                 }
-                */
             },
             WM_PAINT => {
                 let mut rect = windows::Win32::Foundation::RECT::default();
@@ -57,24 +58,18 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 let mut graphics_ptr: *mut GpGraphics = &mut graphics;
                 let graphics_ptr_ptr: *mut *mut GpGraphics = &mut graphics_ptr;
                 let graphics_status = GdipCreateFromHDC(hdc, graphics_ptr_ptr);
-                println!("gprahics_status: {}", graphics_status.0);
-
-                /*
-                let mut cache_img = CACHE_IMG.lock().unwrap();
-                if cache_img.len() > 0 {
-                    windows::Win32::Graphics::GdiPlus::GdipDrawImage(graphics_ptr, &mut cache_img[0], 0.0, 50.0);
-                }
-                */
-
-                let img_path = w!("C:\\Users\\user\\Pictures\\example.bmp");
-                let mut img = windows::Win32::Graphics::GdiPlus::GpImage::default();
-                let mut img_ptr: *mut GpImage = &mut img;
-                let img_ptr_ptr: *mut *mut GpImage = &mut img_ptr;
-                let s = windows::Win32::Graphics::GdiPlus::GdipLoadImageFromFile(img_path, img_ptr_ptr);
-                if s.0 == 0 {
-                    windows::Win32::Graphics::GdiPlus::GdipDrawImage(graphics_ptr, img_ptr, 0.0, 50.0);
+                if graphics_status.0 != 0 {
+                    println!("gprahics_status: {}", graphics_status.0);
                 }
 
+                let img_container_data = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImageContainer;
+                if !img_container_data.is_null() {
+                    let img_container_ptr = &*img_container_data;
+                    let gdip_draw_image_status = windows::Win32::Graphics::GdiPlus::GdipDrawImage(graphics_ptr, img_container_ptr.img_ptr, 0.0, 50.0);
+                    if gdip_draw_image_status.0 != 0 {
+                        println!("GdipDrawImage status: {}", gdip_draw_image_status.0);
+                    }
+                }
             },
             WM_DESTROY => {
                 PostQuitMessage(0);
