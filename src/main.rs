@@ -124,12 +124,22 @@ fn draw(hwnd: HWND) {
             new_height = new_width / ratio;
         }
 
+        let x = if is_height_higher_than_width {
+            ((draw_rect.right as f32) - new_width) * 0.5f32
+        } else {
+            0.0f32
+        };
+        let y = if is_height_higher_than_width {
+            0.0f32
+        } else {
+            ((draw_rect.bottom as f32) - new_height) * 0.5f32
+        };
         let gdip_draw_image_status = unsafe {
             windows::Win32::Graphics::GdiPlus::GdipDrawImageRect(
                 graphics_ptr,
                 img_container_ptr.img_ptr,
-                0.0,
-                0.0,
+                x,
+                y,
                 new_width,
                 new_height,
             )
