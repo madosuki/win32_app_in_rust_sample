@@ -3,6 +3,9 @@ use std::sync::{LazyLock, Mutex};
 
 use std::{os::windows::ffi::OsStrExt};
 
+use windows::Win32::Foundation::COLORREF;
+use windows::Win32::Graphics::Gdi::{CreateCompatibleBitmap, CreateSolidBrush, DeleteDC, DeleteObject, EndPaint, FillRect, WHITE_PEN};
+use windows::Win32::Graphics::GdiPlus::{Bitmap, GdipCreateSolidFill, GdipDeleteBrush, GdipDeleteGraphics, GdipGetPenBrushFill, GdipSetPenBrushFill};
 use windows::Win32::{
     Foundation::{GetLastError, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
     Graphics::{self, Gdi::{BeginPaint, BitBlt, CreateCompatibleDC, SelectObject, DT_WORDBREAK, HBITMAP, HGDIOBJ, SRCCOPY}, GdiPlus::{GdipCreateFromHDC, GdiplusShutdown, GdiplusStartup, GdiplusStartupInput, GpGraphics, GpImage, Image}}, 
@@ -12,7 +15,7 @@ use windows::Win32::{
     }};
 use windows::core::w;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::WindowsAndMessaging::{DefWindowProcW, GetWindowLongPtrW, SetWindowLongPtrW, GWLP_USERDATA};
+use windows::Win32::UI::WindowsAndMessaging::{DefWindowProcW, GetWindowLongPtrW, GetWindowRect, SetWindowLongPtrW, GWLP_USERDATA, WM_ERASEBKGND};
 
 fn convert_u8_to_u16(src: &str) -> Vec<u16> {
     // ref from https://teratail.com/questions/lcimq2rocy2hyu
@@ -44,16 +47,87 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 rect.bottom = 100;
                 rect.left = 50;
                 rect.right = 200;
-                // let _ = GetClientRect(hwnd, &mut rect);
+
+                let mut draw_rect = windows::Win32::Foundation::RECT::default();
+                let _ = GetClientRect(hwnd, &mut draw_rect);
+                let draw_width = if draw_rect.right > 100 {
+                    draw_rect.right - draw_rect.left
+                } else {
+                    640
+                };
+                let draw_height = if draw_rect.bottom > 100 {
+                    draw_rect.bottom - draw_rect.top
+                } else {
+                    480
+                };
 
                 let mut paint = windows::Win32::Graphics::Gdi::PAINTSTRUCT::default();
                 let hdc = BeginPaint(hwnd, &mut paint);
-                let mut text = convert_u8_to_u16("猫 wake up!\r\nHero!");
+
+                let mem_dc = CreateCompatibleDC(Some(hdc));
+                let h_bitmap = CreateCompatibleBitmap(hdc, draw_width, draw_height);
+                let h_bitmap_obj = HGDIOBJ::from(h_bitmap);
+                let old_bitmap = SelectObject(mem_dc, h_bitmap_obj);
+
+                let mut graphics = windows::Win32::Graphics::GdiPlus::GpGraphics::default();
+                let mut graphics_ptr: *mut GpGraphics = &mut graphics;
+                let graphics_ptr_ptr: *mut *mut GpGraphics = &mut graphics_ptr;
+                let graphics_status = GdipCreateFromHDC(mem_dc, graphics_ptr_ptr);
+                if graphics_status.0 != 0 {
+                    println!("gprahics_status: {}", graphics_status.0);
+                }
+                windows::Win32::Graphics::GdiPlus::GdipGraphicsClear(graphics_ptr, windows::Win32::Graphics::GdiPlus::Color::White as u32);
+
+                let img_container_data = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImageContainer;
+                if !img_container_data.is_null() {
+                    let img_container_ptr = &*img_container_data;
+                    let mut width = 0u32;
+                    let mut height = 0u32;
+                    let _ = windows::Win32::Graphics::GdiPlus::GdipGetImageWidth(img_container_ptr.img_ptr, &mut width);
+                    let _ = windows::Win32::Graphics::GdiPlus::GdipGetImageHeight(img_container_ptr.img_ptr, &mut height);
+                    let ratio = (height as f32) / (width as f32);
+
+
+                    let new_height;
+                    let new_width;
+                    if width < height {
+                        new_height = ((draw_rect.bottom - draw_rect.top) as f32) * ratio;
+                        new_width = new_height / ratio;   
+                    } else {
+                        new_width = ((draw_rect.left - draw_rect.right) as f32) * ratio;
+                        new_height = new_width / ratio;
+                    }
+
+
+
+                    let gdip_draw_image_status = windows::Win32::Graphics::GdiPlus::GdipDrawImageRect(
+                        graphics_ptr, 
+                        img_container_ptr.img_ptr,
+                         0.0,
+                         0.0,
+                     new_width, new_height);
+                    if gdip_draw_image_status.0 != 0 {
+                        println!("GdipDrawImage status: {}", gdip_draw_image_status.0);
+                    }
+                }
+
+                GdipDeleteGraphics(graphics_ptr);
+
+                let _ = BitBlt(hdc, 0, 0, draw_width, draw_height, Some(mem_dc), 0, 0, SRCCOPY);
+                SelectObject(mem_dc, old_bitmap);
+                let _ = DeleteObject(h_bitmap_obj);
+                let _ = DeleteDC(mem_dc);
+                let _ = EndPaint(hwnd, &mut paint);
+                // let mut text = convert_u8_to_u16("猫 wake up!\r\nHero!");
+                /*
                 windows::Win32::Graphics::Gdi::DrawTextW(
                     hdc, 
                     &mut text,
                     &mut rect,
                     DT_WORDBREAK);
+                */
+
+                /*
                 let mut graphics = windows::Win32::Graphics::GdiPlus::GpGraphics::default();
                 let mut graphics_ptr: *mut GpGraphics = &mut graphics;
                 let graphics_ptr_ptr: *mut *mut GpGraphics = &mut graphics_ptr;
@@ -61,16 +135,45 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 if graphics_status.0 != 0 {
                     println!("gprahics_status: {}", graphics_status.0);
                 }
+                windows::Win32::Graphics::GdiPlus::GdipGraphicsClear(graphics_ptr, windows::Win32::Graphics::GdiPlus::Color::White as u32);
 
                 let img_container_data = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImageContainer;
                 if !img_container_data.is_null() {
                     let img_container_ptr = &*img_container_data;
-                    let gdip_draw_image_status = windows::Win32::Graphics::GdiPlus::GdipDrawImage(graphics_ptr, img_container_ptr.img_ptr, 0.0, 50.0);
+                    let mut width = 0u32;
+                    let mut height = 0u32;
+                    let _ = windows::Win32::Graphics::GdiPlus::GdipGetImageWidth(img_container_ptr.img_ptr, &mut width);
+                    let _ = windows::Win32::Graphics::GdiPlus::GdipGetImageHeight(img_container_ptr.img_ptr, &mut height);
+                    let ratio = (height as f32) / (width as f32);
+
+
+                    let new_height;
+                    let new_width;
+                    if width < height {
+                        new_height = ((draw_rect.bottom - draw_rect.top) as f32) * ratio;
+                        new_width = new_height / ratio;   
+                    } else {
+                        new_width = ((draw_rect.left - draw_rect.right) as f32) * ratio;
+                        new_height = new_width / ratio;
+                    }
+
+
+
+                    let gdip_draw_image_status = windows::Win32::Graphics::GdiPlus::GdipDrawImageRect(
+                        graphics_ptr, 
+                        img_container_ptr.img_ptr,
+                         0.0,
+                         0.0,
+                     new_width, new_height);
                     if gdip_draw_image_status.0 != 0 {
                         println!("GdipDrawImage status: {}", gdip_draw_image_status.0);
                     }
                 }
+                */
             },
+            WM_ERASEBKGND => {
+                return  LRESULT(0);
+            }
             WM_DESTROY => {
                 PostQuitMessage(0);
             },
