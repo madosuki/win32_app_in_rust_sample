@@ -18,7 +18,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::Win32::{
     Foundation::{GetLastError, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
     Graphics::{
-        self,
         Gdi::{
             BeginPaint, BitBlt, CreateCompatibleDC, DT_WORDBREAK, HBITMAP, HGDIOBJ, SRCCOPY,
             SelectObject,
@@ -108,15 +107,20 @@ fn draw(hwnd: HWND) {
                 &mut height,
             )
         };
-        let ratio = (height as f32) / (width as f32);
+        let is_height_higher_than_width = height > width;
+        let ratio = if is_height_higher_than_width {
+            (height as f32) / (width as f32)
+        } else {
+            (width as f32) / (height as f32)
+        };
 
         let new_height;
         let new_width;
-        if width < height {
-            new_height = ((draw_rect.bottom - draw_rect.top) as f32) * ratio;
+        if is_height_higher_than_width {
+            new_height = draw_rect.bottom as f32;
             new_width = new_height / ratio;
         } else {
-            new_width = ((draw_rect.left - draw_rect.right) as f32) * ratio;
+            new_width = draw_rect.right as f32;
             new_height = new_width / ratio;
         }
 
