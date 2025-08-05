@@ -5,7 +5,7 @@ use std::os::windows::ffi::OsStrExt;
 
 use windows::Win32::Foundation::COLORREF;
 use windows::Win32::Graphics::Gdi::{
-    CreateCompatibleBitmap, CreateSolidBrush, DeleteDC, DeleteObject, EndPaint, FillRect, InvalidateRect, WHITE_PEN
+    CreateCompatibleBitmap, CreateSolidBrush, DeleteDC, DeleteObject, EndPaint, FillRect, InvalidateRect, DRAW_TEXT_FORMAT, WHITE_PEN
 };
 use windows::Win32::Graphics::GdiPlus::{
     Bitmap, GdipCreateSolidFill, GdipDeleteBrush, GdipDeleteGraphics, GdipGetPenBrushFill,
@@ -48,21 +48,15 @@ struct ImageContainer {
 }
 
 fn draw(hwnd: HWND) {
-    let mut rect = windows::Win32::Foundation::RECT::default();
-    rect.top = 0;
-    rect.bottom = 100;
-    rect.left = 50;
-    rect.right = 200;
-
-    let mut draw_rect = windows::Win32::Foundation::RECT::default();
-    let _ = unsafe { GetClientRect(hwnd, &mut draw_rect) };
-    let draw_width = if draw_rect.right > 100 {
-        draw_rect.right - draw_rect.left
+    let mut drawable_rect = windows::Win32::Foundation::RECT::default();
+    let _ = unsafe { GetClientRect(hwnd, &mut drawable_rect) };
+    let drawable_width = if drawable_rect.right > 100 {
+        drawable_rect.right - drawable_rect.left
     } else {
         640
     };
-    let draw_height = if draw_rect.bottom > 100 {
-        draw_rect.bottom - draw_rect.top
+    let drawable_height = if drawable_rect.bottom > 100 {
+        drawable_rect.bottom - drawable_rect.top
     } else {
         480
     };
@@ -71,7 +65,7 @@ fn draw(hwnd: HWND) {
     let hdc = unsafe { BeginPaint(hwnd, &mut paint) };
 
     let mem_dc = unsafe { CreateCompatibleDC(Some(hdc)) };
-    let h_bitmap = unsafe { CreateCompatibleBitmap(hdc, draw_width, draw_height) };
+    let h_bitmap = unsafe { CreateCompatibleBitmap(hdc, drawable_width, drawable_height) };
     let h_bitmap_obj = HGDIOBJ::from(h_bitmap);
     let old_bitmap = unsafe { SelectObject(mem_dc, h_bitmap_obj) };
 
@@ -87,6 +81,15 @@ fn draw(hwnd: HWND) {
             graphics_ptr,
             windows::Win32::Graphics::GdiPlus::Color::White as u32,
         )
+    };
+
+    let mut text_rect = windows::Win32::Foundation::RECT::default();
+    text_rect.top = 100;
+    text_rect.bottom = 200;
+    text_rect.left = 0;
+    text_rect.right = 200;
+    let _ = unsafe {
+        windows::Win32::Graphics::Gdi::DrawTextW(mem_dc, &mut convert_u8_to_u16("猫"), &mut text_rect, DT_WORDBREAK)
     };
 
     let img_container_data =
@@ -114,25 +117,40 @@ fn draw(hwnd: HWND) {
             (width as f32) / (height as f32)
         };
 
-        let new_height;
-        let new_width;
+        let mut draw_img_rect = drawable_rect.clone();
+        draw_img_rect.left = text_rect.right;
+
+        let mut is_overflow = false;
+        let mut new_height;
+        let mut new_width;
         if is_height_higher_than_width {
-            new_height = draw_rect.bottom as f32;
+            new_height = draw_img_rect.bottom as f32;
             new_width = new_height / ratio;
+            
+            let draw_img_width = (draw_img_rect.right - draw_img_rect.left) as f32;
+            if new_width > draw_img_width {
+                new_width =  new_width * 0.5f32;
+                new_height = new_height * 0.5f32;
+                is_overflow = true;
+            }
         } else {
-            new_width = draw_rect.right as f32;
+            new_width = draw_img_rect.right as f32;
             new_height = new_width / ratio;
         }
 
         let x = if is_height_higher_than_width {
-            ((draw_rect.right as f32) - new_width) * 0.5f32
+            ((draw_img_rect.right as f32) - new_width) * 0.5f32
         } else {
             0.0f32
         };
         let y = if is_height_higher_than_width {
-            0.0f32
+            if is_overflow {
+                ((draw_img_rect.bottom as f32) - new_height)  * 0.5f32
+            } else {
+                0.0f32
+            }
         } else {
-            ((draw_rect.bottom as f32) - new_height) * 0.5f32
+            ((draw_img_rect.bottom as f32) - new_height) * 0.5f32
         };
         let gdip_draw_image_status = unsafe {
             windows::Win32::Graphics::GdiPlus::GdipDrawImageRect(
@@ -156,8 +174,8 @@ fn draw(hwnd: HWND) {
             hdc,
             0,
             0,
-            draw_width,
-            draw_height,
+            drawable_width,
+            drawable_height,
             Some(mem_dc),
             0,
             0,
