@@ -87,7 +87,7 @@ fn draw(hwnd: HWND) {
     text_rect.top = 100;
     text_rect.bottom = 200;
     text_rect.left = 0;
-    text_rect.right = 200;
+    text_rect.right = 100;
     let _ = unsafe {
         windows::Win32::Graphics::Gdi::DrawTextW(mem_dc, &mut convert_u8_to_u16("猫"), &mut text_rect, DT_WORDBREAK)
     };
@@ -124,30 +124,47 @@ fn draw(hwnd: HWND) {
         let mut new_height;
         let mut new_width;
         if is_height_higher_than_width {
-            new_height = draw_img_rect.bottom as f32;
+            new_height = (draw_img_rect.bottom - draw_img_rect.top) as f32;
             new_width = new_height / ratio;
             
             let draw_img_width = (draw_img_rect.right - draw_img_rect.left) as f32;
             if new_width > draw_img_width {
-                new_width =  new_width * 0.5f32;
-                new_height = new_height * 0.5f32;
+                let new_draw_height = draw_img_width / ratio;
+
+                new_height = new_draw_height;
+                new_width = new_height / ratio;
+
                 is_overflow = true;
             }
         } else {
-            new_width = draw_img_rect.right as f32;
+            new_width = (draw_img_rect.right - draw_img_rect.left) as f32;
             new_height = new_width / ratio;
+
+            let draw_img_height = (draw_img_rect.bottom - draw_img_rect.top) as f32;
+            if new_height > draw_img_height {
+                let new_draw_width = draw_img_height / ratio;
+
+                new_width = new_draw_width;
+                new_height = new_width / ratio;
+
+                is_overflow = true;
+            }
         }
 
         let x = if is_height_higher_than_width {
             ((draw_img_rect.right as f32) - new_width) * 0.5f32
         } else {
-            0.0f32
+            if is_overflow {
+                ((draw_img_rect.right as f32) - new_width) * 0.5f32
+            } else {
+                draw_img_rect.left as f32
+            }
         };
         let y = if is_height_higher_than_width {
             if is_overflow {
                 ((draw_img_rect.bottom as f32) - new_height)  * 0.5f32
             } else {
-                0.0f32
+                draw_img_rect.top as f32
             }
         } else {
             ((draw_img_rect.bottom as f32) - new_height) * 0.5f32
@@ -192,7 +209,8 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
     unsafe {
         match msg {
             WM_CREATE => {
-                let img_path = w!("C:\\Users\\user\\Pictures\\example.bmp");
+                // let img_path = w!("C:\\Users\\user\\Pictures\\example.bmp"); // for vertical test
+                let img_path = w!("C:\\Users\\user\\Pictures\\example_horizonal.bmp"); // for horizonal test
                 let mut img = windows::Win32::Graphics::GdiPlus::GpImage::default();
                 let mut img_ptr: *mut GpImage = &mut img;
                 let s = windows::Win32::Graphics::GdiPlus::GdipLoadImageFromFile(
