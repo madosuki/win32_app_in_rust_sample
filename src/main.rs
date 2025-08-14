@@ -13,7 +13,7 @@ use windows::Win32::Graphics::GdiPlus::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    DefWindowProcW, GetWindowLongPtrW, GetWindowRect, SetWindowLongPtrW, GWLP_USERDATA, MINMAXINFO, WM_ERASEBKGND, WM_GETMINMAXINFO, WM_SIZE
+    AppendMenuW, CreateMenu, CreateWindowExA, CreateWindowExW, DefWindowProcW, GetWindowLongPtrW, GetWindowRect, MessageBoxW, SetWindowLongPtrW, BS_DEFPUSHBUTTON, GWLP_HINSTANCE, GWLP_USERDATA, HMENU, MB_OK, MF_ENABLED, MINMAXINFO, WM_COMMAND, WM_ERASEBKGND, WM_GETMINMAXINFO, WM_SIZE, WS_CHILD, WS_TABSTOP
 };
 use windows::Win32::{
     Foundation::{GetLastError, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
@@ -222,6 +222,25 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                     let img_container = Box::new(ImageContainer { img_ptr: img_ptr });
                     SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(img_container) as isize);
                 }
+
+                let mut hinst_from_longptr = GetWindowLongPtrW(hwnd, GWLP_HINSTANCE);
+                let hinst_ptr: *mut isize = &mut hinst_from_longptr;
+                let hinst = HINSTANCE(hinst_ptr as *mut std::ffi::c_void);
+                let button_num = 1001isize;
+                let button_hmenu = HMENU(button_num as *mut _);
+                let _ = 
+                CreateWindowExW(WS_EX_OVERLAPPEDWINDOW,
+                     w!("BUTTON"),
+                     w!("PUSH ME"),
+                     WS_TABSTOP | WS_VISIBLE | WS_CHILD,
+                     0, 
+                     0, 
+                     100,
+                     100,
+                     Some(hwnd),
+                     Some(button_hmenu),
+                     Some(hinst),
+                     None);
             }
             WM_GETMINMAXINFO => {
                 let min_max_info = lparam.0 as *mut MINMAXINFO;
@@ -239,6 +258,18 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             WM_PAINT => {
                 draw(hwnd);
             }
+            WM_COMMAND => {
+                let command = wparam.0 & 0xFFFF;
+                println!("get command {command}");
+                match command {
+                    1001 =>{
+                        MessageBoxW(Some(hwnd), w!("Click!"), w!(""), MB_OK);
+                    },
+                    _ => {
+
+                    }
+                }
+            },
             WM_ERASEBKGND => {
                 return LRESULT(0);
             }
