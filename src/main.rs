@@ -43,6 +43,10 @@ fn convert_u8_to_u16(src: &str) -> Vec<u16> {
     a
 }
 
+fn create_button_hmenu(button_id: isize) -> HMENU {
+    HMENU(button_id as *mut _)
+}
+
 struct ImageContainer {
     img_ptr: *mut GpImage,
 }
@@ -226,8 +230,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 let mut hinst_from_longptr = GetWindowLongPtrW(hwnd, GWLP_HINSTANCE);
                 let hinst_ptr: *mut isize = &mut hinst_from_longptr;
                 let hinst = HINSTANCE(hinst_ptr as *mut std::ffi::c_void);
-                let button_num = 1001isize;
-                let button_hmenu = HMENU(button_num as *mut _);
+                let button_hmenu = create_button_hmenu(1001isize);
                 let _ = 
                 CreateWindowExW(WS_EX_OVERLAPPEDWINDOW,
                      w!("BUTTON"),
