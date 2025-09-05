@@ -122,7 +122,7 @@ fn draw(hwnd: HWND) {
         };
 
         let mut draw_img_rect = drawable_rect.clone();
-        draw_img_rect.left = text_rect.right;
+        draw_img_rect.left = text_rect.right + 100;
 
         let mut is_overflow = false;
         let mut new_height;
@@ -133,10 +133,10 @@ fn draw(hwnd: HWND) {
             
             let draw_img_width = (draw_img_rect.right - draw_img_rect.left) as f32;
             if new_width > draw_img_width {
-                let new_draw_height = draw_img_width / ratio;
+                let new_draw_height = draw_img_width * ratio;
 
                 new_height = new_draw_height;
-                new_width = new_height / ratio;
+                new_width = draw_img_width;
 
                 is_overflow = true;
             }
@@ -146,10 +146,10 @@ fn draw(hwnd: HWND) {
 
             let draw_img_height = (draw_img_rect.bottom - draw_img_rect.top) as f32;
             if new_height > draw_img_height {
-                let new_draw_width = draw_img_height / ratio;
+                let new_draw_width = draw_img_height * ratio;
 
                 new_width = new_draw_width;
-                new_height = new_width / ratio;
+                new_height = draw_img_height;
 
                 is_overflow = true;
             }
@@ -213,8 +213,8 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
     unsafe {
         match msg {
             WM_CREATE => {
-                // let img_path = w!("C:\\Users\\user\\Pictures\\example.bmp"); // for vertical test
-                let img_path = w!("C:\\Users\\user\\Pictures\\example_horizonal.bmp"); // for horizonal test
+                let img_path = w!("C:\\Users\\user\\Pictures\\example.bmp"); // for vertical test
+                // let img_path = w!("C:\\Users\\user\\Pictures\\example_horizonal.bmp"); // for horizonal test
                 let mut img = windows::Win32::Graphics::GdiPlus::GpImage::default();
                 let mut img_ptr: *mut GpImage = &mut img;
                 let s = windows::Win32::Graphics::GdiPlus::GdipLoadImageFromFile(
@@ -266,7 +266,7 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 println!("get command {command}");
                 match command {
                     1001 =>{
-                        MessageBoxW(Some(hwnd), w!("Click!"), w!(""), MB_OK);
+                        MessageBoxW(Some(hwnd), w!("Click!"), w!("Nyan"), MB_OK);
                     },
                     _ => {
 
